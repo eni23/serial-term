@@ -7,6 +7,9 @@
 *
 *******************************************************************************/
 
+#ifndef SerialTerm_h
+#define SerialTerm_h
+
 #include <Arduino.h>
 #include <stdarg.h>
 
@@ -43,6 +46,7 @@
 #define TTY_CURSOR_RIGHT(x) "\x1b[xC"
 #define TTY_CURSOR_LEFT(x)  "\x1b[xD"
 #define TTY_CURSOR_HOME     "\x1b[H"
+
 
 
 typedef void (*SerialTermCallback) ();
@@ -87,6 +91,19 @@ class SerialTerm {
     	parse_line();
     	return;
   	}
+		// TAB
+		if (current_char == '\t') {
+			tab_completion();
+			return;
+		}
+		// up && down && l && r
+		/*if ( (current_char == 65) || // up
+				 (current_char == 66) || // down
+				 (current_char == 67) || // left
+				 (current_char == 68) ){ // right
+			return;
+		}*/
+
 		// put every other char than cr into buffer
   	Serial.print( current_char );
   	buffer[buffer_pos] = current_char;
@@ -98,8 +115,12 @@ class SerialTerm {
 	 * parse_line() gets called when rcv_char() detects a newline
 	 **/
 	void parse_line(){
+		// split input line by spaces and take the first item as command
 	  String command = "";
 	  command = str_token( last_line, ' ', 0 );
+		if (command.endsWith(" ")){
+			command = command.substring(0, command.length()-1);
+		}
 
 	  // empty buffer and zero counter
 	  memset(buffer, 0, sizeof( buffer ) );
@@ -125,9 +146,79 @@ class SerialTerm {
 
 		// if nothing matches, command not found
 		debug("unknown command");
+		printf("last_line '%s'\n\r", str2char(last_line) );
 		return;
 	}
 
+
+	String get_buff_input(){
+		String input = String("");
+		if (buffer_pos>0){
+			char tb[buffer_pos+1];
+			for (int i=0; i<buffer_pos;i++){
+				tb[i] = buffer[i];
+			}
+			tb[buffer_pos+1]='\0';
+			input = String(tb);
+		}
+		return input;
+	}
+
+
+	//
+	// Experimential: command tab completion
+	//
+	void tab_completion() {
+
+		String input = get_buff_input();
+		// return if function arg
+		String s_chk = str_token(input, ' ', 1);
+		if (s_chk.length()>0){
+			return;
+		}
+		// count matches and get last one
+		int cmdc = 0;
+		int last_match = 0;
+		for (int i=0; i<TTY_MAX_CMDS; i++){
+			if (lookup_table[i].startsWith(input)){
+				cmdc++;
+				last_match = i;
+			}
+		}
+		// nothing matches: return
+		if (cmdc==0){
+			return;
+		}
+		// 1 match: complete command
+		if (cmdc==1){
+			String pstr = lookup_table[last_match].substring(input.length());
+			// fill buffer
+			for (int i=0; i<pstr.length();i++){
+				buffer[buffer_pos] = pstr.charAt(i);
+				buffer_pos++;
+			}
+			buffer[buffer_pos] = ' ';
+			buffer_pos++;
+			Serial.print(pstr);
+			Serial.print(" ");
+			return;
+		}
+		// more than 1 match: print commands
+		// TODO: complete to same
+		if (cmdc>1) {
+			Serial.print("\x1b\n\r");
+			//int reslen = 0;
+			for (int i=0; i<TTY_MAX_CMDS; i++){
+				if (lookup_table[i].startsWith(input)){
+					//reslen+=(lookup_table[i].length()+4);
+					Serial.print(lookup_table[i]);
+					Serial.print('\t');
+				}
+			}
+			Serial.print("\n\r");
+			Serial.print(input);
+		}
+	}
 
 
   public:
@@ -241,6 +332,13 @@ class SerialTerm {
 	}
 
 
+	char* str2char(String s){
+		char charbuff[s.length()+1];
+		s.toCharArray(charbuff, s.length()+1);
+		return charbuff;
+	}
+
+
 	/**
 	 * Get single lastline argument as string
 	 **/
@@ -270,26 +368,6 @@ class SerialTerm {
 	}
 
 
-	//
-	// VT100 Stuff
-	//
-	void set_color(char* color){
-		Serial.print(color);
-	}
-
-	void cursor(int x, int y){
-		Serial.print(TTY_CURSOR_XY(x,y));
-	}
-
-	void cls(){
-		Serial.print(TTY_CLS);
-	}
-
-
-	//
-	// High level interfaces
-	//
-
 	/**
 	 * Set an callback for a command
 	 **/
@@ -309,4 +387,7 @@ class SerialTerm {
   	}
   }
 
+
 };
+
+#endif

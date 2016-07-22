@@ -46,6 +46,8 @@
 #define TTY_CURSOR_RIGHT(x) "\x1b[xC"
 #define TTY_CURSOR_LEFT(x)  "\x1b[xD"
 #define TTY_CURSOR_HOME     "\x1b[H"
+#define TTY_CURSOR_SAFE     "\x1b7"
+#define TTY_CURSOR_RESTORE  "\x1b8"
 
 
 
@@ -60,6 +62,11 @@ class SerialTerm {
 	char buffer[TTY_BUFFER_SIZE];
 	// current position in the buffer
 	int buffer_pos;
+
+	int cursor_v;
+	int cursor_h;
+	bool begin_escape;
+
 	// next free callback slot
 	int callback_pos;
 	// cmd callback name lookup table
@@ -73,16 +80,41 @@ class SerialTerm {
 	 * rcv_char() is getting called for every char recived by serial
 	 **/
 	void rcv_char(){
+
+
 		char current_char = Serial.read();
+
+		// cut out escape sequences
+		if (current_char==27){
+			begin_escape = true;
+			return;
+		}
+		if (begin_escape and current_char==91 ){
+			begin_escape = false;
+			return;
+		}
+		begin_escape = false;
+
 		// backspace: delete last char in buffer
   	if ( current_char == 0x7F && buffer_pos > 0 ) {
-    	buffer[buffer_pos-1];
-    	buffer_pos--;
-    	Serial.print("\b");
-    	Serial.print(" ");
-    	Serial.print("\b");
-    	return;
+			if (cursor_h == buffer_pos){
+				buffer[buffer_pos-1];
+    		buffer_pos--;
+				cursor_h--;
+				printf("\b \b");
+				return;
+			}
+			for(int i = cursor_h-1; i < buffer_pos; i++){
+				buffer[i] = buffer[i+1];
+			}
+			buffer[buffer_pos] = '\0';
+			buffer_pos--;
+			cursor_h--;
+			render_line();
+			printf("\033[%iD", (buffer_pos-cursor_h) );
+			return;
   	}
+
   	// carriage return recived = new line
   	if (current_char == 13) {
     	Serial.println( current_char );
@@ -97,17 +129,34 @@ class SerialTerm {
 			return;
 		}
 		// up && down && l && r
-		/*if ( (current_char == 65) || // up
-				 (current_char == 66) || // down
-				 (current_char == 67) || // left
-				 (current_char == 68) ){ // right
+		if ( (current_char == 65) || // up
+				 (current_char == 66) ){  // down
 			return;
-		}*/
+		}
+		if (current_char == 67) {
+			cursor_h++;
+			Serial.print("\033[1C");
+			return;
+		}
+		if (current_char == 68) {
+			cursor_h--;
+			Serial.print("\033[1D");
+			return;
+		}
 
 		// put every other char than cr into buffer
-  	Serial.print( current_char );
   	buffer[buffer_pos] = current_char;
   	buffer_pos++;
+		cursor_h++;
+		render_line();
+	}
+
+
+	void render_line(){
+		printf("\x1b[2K\x1b[%iD", buffer_pos);
+		for (int i=0; i<(buffer_pos); i++){
+			Serial.print(buffer[i]);
+		}
 	}
 
 
@@ -125,6 +174,7 @@ class SerialTerm {
 	  // empty buffer and zero counter
 	  memset(buffer, 0, sizeof( buffer ) );
 	  buffer_pos = 0;
+		cursor_h = 0;
 
 	  // simple pong for recognition
 	  if (  command ==  "ping" ) {
@@ -137,7 +187,6 @@ class SerialTerm {
 		}
 
 		for (int i=0; i<TTY_MAX_CMDS; i++){
-
 			if (command==lookup_table[i]){
 				callbacks[i]();
 				return;
@@ -231,7 +280,9 @@ class SerialTerm {
   SerialTerm() {
 		buffer_pos = 0;
 		callback_pos = 0;
+		cursor_h = 0;
 		last_line = "";
+		begin_escape = true;
   }
 
 	/**
@@ -239,6 +290,7 @@ class SerialTerm {
 	 **/
 	void begin(int TTY_baud){
 		Serial.begin( TTY_baud );
+		Serial.print("\x1b\x63");
 	}
 
 

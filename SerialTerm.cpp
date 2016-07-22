@@ -128,22 +128,29 @@ class SerialTerm {
 			tab_completion();
 			return;
 		}
-		// up && down && l && r
+		// up && down
 		if ( (current_char == 65) || // up
 				 (current_char == 66) ){  // down
 			return;
 		}
+		// left
 		if (current_char == 67) {
+			if (cursor_h==buffer_pos or buffer_pos==0){
+				return;
+			}
 			cursor_h++;
 			Serial.print("\033[1C");
 			return;
 		}
+		// right
 		if (current_char == 68) {
+			if ((cursor_h-1)<0 or buffer_pos==0){
+				return;
+			}
 			cursor_h--;
 			Serial.print("\033[1D");
 			return;
 		}
-
 		// put every other char than cr into buffer
   	buffer[buffer_pos] = current_char;
   	buffer_pos++;
@@ -178,9 +185,15 @@ class SerialTerm {
 
 	  // simple pong for recognition
 	  if (  command ==  "ping" ) {
-	    Serial.println( "pong" );
+	    printf( "pong" );
 	    return;
 	  }
+		if (  command ==  "cls" or command == "clear") {
+	    printf(TTY_CLS TTY_CURSOR_HOME);
+	    return;
+	  }
+
+
 		// catch empty command
 		if ( command == ""){
 			return;

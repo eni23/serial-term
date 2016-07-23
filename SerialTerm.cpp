@@ -151,11 +151,23 @@ class SerialTerm {
 			Serial.print("\033[1D");
 			return;
 		}
+
 		// put every other char than cr into buffer
-  	buffer[buffer_pos] = current_char;
+  	if (cursor_h == buffer_pos){
+			buffer[buffer_pos] = current_char;
+		}
+		else {
+			for (int i = buffer_pos - 1; i >= cursor_h; i--){
+				buffer[i+1] = buffer[i];
+			}
+			buffer[cursor_h] = current_char;
+		}
   	buffer_pos++;
 		cursor_h++;
 		render_line();
+		if (buffer_pos!=cursor_h){
+			printf("\033[%iD", (buffer_pos-cursor_h) );
+		}
 	}
 
 

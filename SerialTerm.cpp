@@ -209,6 +209,21 @@ private:
     }
   }
 
+
+  /**
+  * Add a string to history array
+  **/
+  void history_add(String data) {
+    for (int k = TTY_HIST_SIZE-1; k >0; k--){
+      history[k]=history[k-1];
+    }
+    history[0] = data;
+  }
+
+
+  /**
+  * show history at given position
+  **/
   void show_history(int position){
     String hline = history[position];
     if (hline==""){
@@ -225,6 +240,7 @@ private:
     buffer[hline.length()] = '\0';
     draw_buffer();
   }
+
 
   /**
   * Experimential: command tab completion
@@ -296,6 +312,7 @@ private:
     }
   }
 
+
   /**
   * Get current input
   **/
@@ -310,14 +327,6 @@ private:
       input = String(tb);
     }
     return input;
-  }
-
-
-  void history_add(String data) {
-    for (int k = TTY_HIST_SIZE-1; k >0; k--){
-      history[k]=history[k-1];
-    }
-    history[0] = data;
   }
 
 

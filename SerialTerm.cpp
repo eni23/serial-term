@@ -15,11 +15,11 @@
 
 
 #ifndef TTY_BUFFER_SIZE
-	#define TTY_BUFFER_SIZE 128
+#define TTY_BUFFER_SIZE 128
 #endif
 
 #ifndef TTY_MAX_CMDS
-	#define TTY_MAX_CMDS 16
+#define TTY_MAX_CMDS 16
 #endif
 
 
@@ -57,7 +57,7 @@ typedef void (*SerialTermCallback) ();
 
 class SerialTerm {
 
-	private:
+private:
 	// buffer for line input
 	char buffer[TTY_BUFFER_SIZE];
 	// current position in the buffer
@@ -77,8 +77,8 @@ class SerialTerm {
 	String last_line;
 
 	/**
-	 * rcv_char() is getting called for every char recived by serial
-	 **/
+	* rcv_char() is getting called for every char recived by serial
+	**/
 	void rcv_char(){
 
 		char current_char = Serial.read();
@@ -104,16 +104,16 @@ class SerialTerm {
 		if (isPrintable(current_char)) is_printable = true;
 		if (isAscii(current_char)) is_ascii = true;
 		printf("current_char=%i ctrl=%d alpha=%d print=%d ascii=%d\n\r",
-					(int)current_char, is_control, is_alphanum, is_printable, is_ascii);
+		(int)current_char, is_control, is_alphanum, is_printable, is_ascii);
 		return;
 		*/
 
 		// backspace: delete last char in buffer
-  	if ( current_char == 0x7F && buffer_pos > 0 ) {
+		if ( current_char == 0x7F && buffer_pos > 0 ) {
 			// cursor at end
 			if (cursor_h == buffer_pos){
 				buffer[buffer_pos-1];
-    		buffer_pos--;
+				buffer_pos--;
 				cursor_h--;
 				printf("\b \b");
 				return;
@@ -128,15 +128,15 @@ class SerialTerm {
 			draw_buffer();
 			printf("\033[%iD", (buffer_pos-cursor_h) );
 			return;
-  	}
-  	// carriage return recived = new line
-  	if (current_char == 13) {
-    	Serial.println( current_char );
-    	buffer[buffer_pos] = '\0';
+		}
+		// carriage return recived = new line
+		if (current_char == 13) {
+			Serial.println( current_char );
+			buffer[buffer_pos] = '\0';
 			last_line = String(buffer);
-    	parse_line();
-    	return;
-  	}
+			parse_line();
+			return;
+		}
 		// TAB: completion
 		if (current_char == '\t') {
 			tab_completion();
@@ -144,7 +144,7 @@ class SerialTerm {
 		}
 		// up && down
 		if ( (current_char == 65) || // up
-				 (current_char == 66) ){  // down
+		(current_char == 66) ){  // down
 			return;
 		}
 		// left
@@ -168,7 +168,7 @@ class SerialTerm {
 
 		// put every other char than cr into buffer
 		// cursor at the end
-  	if (cursor_h == buffer_pos){
+		if (cursor_h == buffer_pos){
 			buffer[buffer_pos] = current_char;
 		}
 		// cursor somewhere else
@@ -178,7 +178,7 @@ class SerialTerm {
 			}
 			buffer[cursor_h] = current_char;
 		}
-  	buffer_pos++;
+		buffer_pos++;
 		cursor_h++;
 		draw_buffer();
 		// if cursor not at the end, move cursor to correct position
@@ -189,8 +189,8 @@ class SerialTerm {
 
 
 	/**
-	 * Experimential: command tab completion
-	 **/
+	* Experimential: command tab completion
+	**/
 	void tab_completion() {
 
 		String input = get_buff_input();
@@ -249,8 +249,8 @@ class SerialTerm {
 
 
 	/**
-	 * clear line and draw buffer
-	 **/
+	* clear line and draw buffer
+	**/
 	void draw_buffer(){
 		printf("\x1b[2K\x1b[%iD", buffer_pos);
 		for (int i=0; i<(buffer_pos); i++){
@@ -259,8 +259,8 @@ class SerialTerm {
 	}
 
 	/**
-	 * Get current input
-	 **/
+	* Get current input
+	**/
 	String get_buff_input(){
 		String input = String("");
 		if (buffer_pos>0){
@@ -276,30 +276,30 @@ class SerialTerm {
 
 
 	/**
-	 * parse_line() gets called when rcv_char() detects a newline
-	 **/
+	* parse_line() gets called when rcv_char() detects a newline
+	**/
 	void parse_line(){
 		// split input line by spaces and take the first item as command
-	  String command = "";
-	  command = str_token( last_line, ' ', 0 );
+		String command = "";
+		command = str_token( last_line, ' ', 0 );
 		if (command.endsWith(" ")){
 			command = command.substring(0, command.length()-1);
 		}
 
-	  // empty buffer and zero counter
-	  memset(buffer, 0, sizeof( buffer ) );
-	  buffer_pos = 0;
+		// empty buffer and zero counter
+		memset(buffer, 0, sizeof( buffer ) );
+		buffer_pos = 0;
 		cursor_h = 0;
 
-	  // simple pong for recognition
-	  if (  command ==  "ping" ) {
-	    printf( "pong" );
-	    return;
-	  }
+		// simple pong for recognition
+		if (  command ==  "ping" ) {
+			printf( "pong" );
+			return;
+		}
 		if (  command ==  "cls" or command == "clear") {
-	    printf(TTY_CLS TTY_CURSOR_HOME);
-	    return;
-	  }
+			printf(TTY_CLS TTY_CURSOR_HOME);
+			return;
+		}
 
 		// catch empty command
 		if ( command == ""){
@@ -322,24 +322,24 @@ class SerialTerm {
 
 
 
-  public:
+public:
 
 	boolean debug_enabled = true;
 
 	/**
-	 * Constructor
-	 **/
-  SerialTerm() {
+	* Constructor
+	**/
+	SerialTerm() {
 		buffer_pos = 0;
 		callback_pos = 0;
 		cursor_h = 0;
 		last_line = "";
 		begin_escape = true;
-  }
+	}
 
 	/**
-	 * Begin Serial
-	 **/
+	* Begin Serial
+	**/
 	void begin(int TTY_baud){
 		Serial.begin( TTY_baud );
 		Serial.print("\x1b\x63");
@@ -347,28 +347,28 @@ class SerialTerm {
 
 
 	/**
-	 * printf to terminal
-	 * This function does not support String since it uses variadic
-	 **/
+	* printf to terminal
+	* This function does not support String since it uses variadic
+	**/
 	void printf(char *fmt, ... ){
-	  char buf[256];
-	  va_list args;
-	  va_start (args, fmt );
-	  vsnprintf(buf, 256, fmt, args);
-	  va_end (args);
-	  Serial.print(buf);
+		char buf[256];
+		va_list args;
+		va_start (args, fmt );
+		vsnprintf(buf, 256, fmt, args);
+		va_end (args);
+		Serial.print(buf);
 	}
 
 
 	/**
-	 * printf with an color
-	 **/
+	* printf with an color
+	**/
 	void printf_color(char* color, char *fmt, ... ){
-	  char buf[256]; // resulting string limited to 256 chars
-	  va_list args;
-	  va_start (args, fmt );
-	  vsnprintf(buf, 256, fmt, args);
-	  va_end (args);
+		char buf[256]; // resulting string limited to 256 chars
+		va_list args;
+		va_start (args, fmt );
+		vsnprintf(buf, 256, fmt, args);
+		va_end (args);
 		printf("\033[%sm", color );
 		Serial.print(buf);
 		printf("\033[%sm", TTY_COLOR_RST );
@@ -376,57 +376,57 @@ class SerialTerm {
 
 
 	/**
-	 * Read raw binary of fixed size
-	 **/
+	* Read raw binary of fixed size
+	**/
 	uint8_t* read_binary(int len){
 		uint8_t chbuffer[len+1];
-    int cc = 0;
-    delay(100);
-    while (cc<len){
-      chbuffer[cc] = Serial.read();
-      cc++;
-    }
+		int cc = 0;
+		delay(100);
+		while (cc<len){
+			chbuffer[cc] = Serial.read();
+			cc++;
+		}
 		return chbuffer;
 	}
 
 
 	/**
-	 * Print a message this->debug_enabled is set to true
-	 **/
+	* Print a message this->debug_enabled is set to true
+	**/
 	void debug( const char* message ) {
-	  if ( debug_enabled ) {
-	   Serial.println( message );
-	  }
+		if ( debug_enabled ) {
+			Serial.println( message );
+		}
 	}
 
 
 	/**
-	 * Get single lastline argument as integer
-	 **/
+	* Get single lastline argument as integer
+	**/
 	int intArg(int index){
-	  String s_str = "";
-	  s_str = strArg( index );
-	  int s;
-	  s = s_str.toInt();
-	  return s;
+		String s_str = "";
+		s_str = strArg( index );
+		int s;
+		s = s_str.toInt();
+		return s;
 	}
 
 
 	/**
-	 * Get single lastline argument as float
-	 **/
+	* Get single lastline argument as float
+	**/
 	float floatArg(int index){
-	  String s_str = "";
-	  s_str = strArg( index );
-	  float s;
-	  s = s_str.toFloat();
-	  return s;
+		String s_str = "";
+		s_str = strArg( index );
+		float s;
+		s = s_str.toFloat();
+		return s;
 	}
 
 
 	/**
-	 * Get single lastline argument as char array
-	 **/
+	* Get single lastline argument as char array
+	**/
 	char* charArg(int index){
 		String s_str = "";
 		s_str = str_token(last_line, ' ', index+1);
@@ -444,37 +444,37 @@ class SerialTerm {
 
 
 	/**
-	 * Get single lastline argument as string
-	 **/
+	* Get single lastline argument as string
+	**/
 	String strArg(int index){
 		return str_token(last_line, ' ', index+1);
 	}
 
 
 	/**
-	 * split a string and get chuck at desired position
-	 * example:
-	 * data="foo,bar,baz" separator="," index=2  => baz
-	 * data="foo/bar" separator="/" index=0  => foo
-	 **/
+	* split a string and get chuck at desired position
+	* example:
+	* data="foo,bar,baz" separator="," index=2  => baz
+	* data="foo/bar" separator="/" index=0  => foo
+	**/
 	String str_token( String data, char separator, int index ) {
-	  int found = 0;
-	  int strIndex[] = { 0, -1 };
-	  int maxIndex = data.length()-1;
-	  for( int i = 0; i <= maxIndex && found <= index; i++ ){
-	    if( data.charAt( i ) == separator || i == maxIndex ){
-	        found++;
-	        strIndex[0] = strIndex[1] + 1;
-	        strIndex[1] = ( i == maxIndex ) ? i + 1 : i;
-	    }
-	  }
-	  return found > index ? data.substring( strIndex[0], strIndex[1] ) : "";
+		int found = 0;
+		int strIndex[] = { 0, -1 };
+		int maxIndex = data.length()-1;
+		for( int i = 0; i <= maxIndex && found <= index; i++ ){
+			if( data.charAt( i ) == separator || i == maxIndex ){
+				found++;
+				strIndex[0] = strIndex[1] + 1;
+				strIndex[1] = ( i == maxIndex ) ? i + 1 : i;
+			}
+		}
+		return found > index ? data.substring( strIndex[0], strIndex[1] ) : "";
 	}
 
 
 	/**
-	 * Set an callback for a command
-	 **/
+	* Set an callback for a command
+	**/
 	void on(String cmd, SerialTermCallback func){
 		lookup_table[callback_pos] = cmd;
 		callbacks[callback_pos] = func;
@@ -483,13 +483,13 @@ class SerialTerm {
 
 
 	/**
-	 * Poll function, needs to run in main loop
-	 **/
-  void run(){
+	* Poll function, needs to run in main loop
+	**/
+	void run(){
 		if ( Serial.available() ) {
-    	rcv_char();
-  	}
-  }
+			rcv_char();
+		}
+	}
 
 
 };

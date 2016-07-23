@@ -15,13 +15,16 @@
 
 
 #ifndef TTY_BUFFER_SIZE
-#define TTY_BUFFER_SIZE 128
+  #define TTY_BUFFER_SIZE 128
 #endif
 
 #ifndef TTY_MAX_CMDS
-#define TTY_MAX_CMDS 16
+  #define TTY_MAX_CMDS 16
 #endif
 
+#ifndef TTY_HIST_SIZE
+  #define TTY_HIST_SIZE 8
+#endif
 
 // Terminal escape sequences
 #define TTY_OFF             "\x1b[0m"
@@ -75,6 +78,10 @@ private:
   SerialTermCallback callbacks[TTY_MAX_CMDS];
   // last line, used for getArg functions
   String last_line;
+
+  // history
+  String history[TTY_HIST_SIZE];
+  int history_pos;
 
   /**
   * rcv_char() is getting called for every char recived by serial
@@ -142,12 +149,27 @@ private:
       tab_completion();
       return;
     }
-    // up && down
-    if ( (current_char == 65) || // up
-    (current_char == 66) ){  // down
+    // cursor down: history
+    if ( (current_char == 66) ){  // down
+      if (history_pos>1){
+        history_pos--;
+      } else {
+        return;
+      }
+      show_history(history_pos-1);
       return;
     }
-    // left
+    // cursor up: history
+    if (current_char == 65){
+      if (history_pos<TTY_HIST_SIZE){
+        history_pos++;
+      } else {
+        return;
+      }
+      show_history(history_pos-1);
+      return;
+    }
+    // cursor left
     if (current_char == 67) {
       if (cursor_h==buffer_pos or buffer_pos==0){
         return;
@@ -156,7 +178,7 @@ private:
       Serial.print("\033[1C");
       return;
     }
-    // right
+    // cursor right
     if (current_char == 68) {
       if ((cursor_h-1)<0 or buffer_pos==0){
         return;
@@ -187,6 +209,22 @@ private:
     }
   }
 
+  void show_history(int position){
+    String hline = history[position];
+    if (hline==""){
+      return;
+    }
+    memset(buffer, 0, sizeof( buffer ) );
+    buffer_pos=0;
+    cursor_h=0;
+    for (int i=0; i<hline.length()+1; i++){
+      buffer[i] = hline.charAt(i);
+      buffer_pos++;
+      cursor_h++;
+    }
+    buffer[hline.length()] = '\0';
+    draw_buffer();
+  }
 
   /**
   * Experimential: command tab completion
@@ -275,6 +313,14 @@ private:
   }
 
 
+  void history_add(String data) {
+    for (int k = TTY_HIST_SIZE-1; k >0; k--){
+      history[k]=history[k-1];
+    }
+    history[0] = data;
+  }
+
+
   /**
   * parse_line() gets called when rcv_char() detects a newline
   **/
@@ -291,6 +337,14 @@ private:
     buffer_pos = 0;
     cursor_h = 0;
 
+    // catch empty command
+    if ( command == ""){
+      return;
+    }
+
+    // add command to history
+    history_add(last_line);
+
     // simple pong for recognition
     if (  command ==  "ping" ) {
       printf( "pong" );
@@ -301,8 +355,11 @@ private:
       return;
     }
 
-    // catch empty command
-    if ( command == ""){
+    if ( command == "history"){
+      for (int i = 0; i<TTY_HIST_SIZE; i++){
+        printf("%i: ", i);
+        Serial.println(history[i]);
+      }
       return;
     }
 
@@ -335,6 +392,7 @@ public:
     cursor_h = 0;
     last_line = "";
     begin_escape = true;
+    history_pos = 0;
   }
 
   /**

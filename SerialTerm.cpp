@@ -81,7 +81,6 @@ class SerialTerm {
 	 **/
 	void rcv_char(){
 
-
 		char current_char = Serial.read();
 
 		// cut out escape sequences
@@ -95,8 +94,23 @@ class SerialTerm {
 		}
 		begin_escape = false;
 
+		/*
+		bool is_control = false;
+		bool is_alphanum = false;
+		bool is_printable = false;
+		bool is_ascii = false;
+		if (isControl(current_char)) is_control = true;
+		if (isAlphaNumeric(current_char)) is_alphanum = true;
+		if (isPrintable(current_char)) is_printable = true;
+		if (isAscii(current_char)) is_ascii = true;
+		printf("current_char=%i ctrl=%d alpha=%d print=%d ascii=%d\n\r",
+					(int)current_char, is_control, is_alphanum, is_printable, is_ascii);
+		return;
+		*/
+
 		// backspace: delete last char in buffer
   	if ( current_char == 0x7F && buffer_pos > 0 ) {
+			// cursor at end
 			if (cursor_h == buffer_pos){
 				buffer[buffer_pos-1];
     		buffer_pos--;
@@ -104,17 +118,17 @@ class SerialTerm {
 				printf("\b \b");
 				return;
 			}
+			// cursor somewhere else
 			for(int i = cursor_h-1; i < buffer_pos; i++){
 				buffer[i] = buffer[i+1];
 			}
 			buffer[buffer_pos] = '\0';
 			buffer_pos--;
 			cursor_h--;
-			render_line();
+			draw_buffer();
 			printf("\033[%iD", (buffer_pos-cursor_h) );
 			return;
   	}
-
   	// carriage return recived = new line
   	if (current_char == 13) {
     	Serial.println( current_char );
@@ -123,7 +137,7 @@ class SerialTerm {
     	parse_line();
     	return;
   	}
-		// TAB
+		// TAB: completion
 		if (current_char == '\t') {
 			tab_completion();
 			return;
@@ -153,9 +167,11 @@ class SerialTerm {
 		}
 
 		// put every other char than cr into buffer
+		// cursor at the end
   	if (cursor_h == buffer_pos){
 			buffer[buffer_pos] = current_char;
 		}
+		// cursor somewhere else
 		else {
 			for (int i = buffer_pos - 1; i >= cursor_h; i--){
 				buffer[i+1] = buffer[i];
@@ -164,18 +180,98 @@ class SerialTerm {
 		}
   	buffer_pos++;
 		cursor_h++;
-		render_line();
+		draw_buffer();
+		// if cursor not at the end, move cursor to correct position
 		if (buffer_pos!=cursor_h){
 			printf("\033[%iD", (buffer_pos-cursor_h) );
 		}
 	}
 
 
-	void render_line(){
+	/**
+	 * Experimential: command tab completion
+	 **/
+	void tab_completion() {
+
+		String input = get_buff_input();
+
+		// return if function arg
+		String s_chk = str_token(input, ' ', 1);
+		if (s_chk.length()>0){
+			return;
+		}
+		// count matches and get last one
+		int cmdc = 0;
+		int last_match = 0;
+		for (int i=0; i<TTY_MAX_CMDS; i++){
+			if (lookup_table[i].startsWith(input)){
+				cmdc++;
+				last_match = i;
+			}
+		}
+		// nothing matches: return
+		if (cmdc==0){
+			return;
+		}
+		// 1 match: complete command
+		if (cmdc==1){
+			String pstr = lookup_table[last_match].substring(input.length());
+			// fill buffer
+			for (int i=0; i<pstr.length();i++){
+				buffer[buffer_pos] = pstr.charAt(i);
+				buffer_pos++;
+				cursor_h++;
+			}
+			buffer[buffer_pos] = ' ';
+			buffer_pos++;
+			cursor_h++;
+			Serial.print(pstr);
+			Serial.print(" ");
+			return;
+		}
+		// more than 1 match: print commands
+		// TODO: complete to same
+		// TODO: builtins
+		if (cmdc>1) {
+			Serial.print("\x1b\n\r");
+			//int reslen = 0;
+			for (int i=0; i<TTY_MAX_CMDS; i++){
+				if (lookup_table[i].startsWith(input)){
+					//reslen+=(lookup_table[i].length()+4);
+					Serial.print(lookup_table[i]);
+					Serial.print('\t');
+				}
+			}
+			Serial.print("\n\r");
+			Serial.print(input);
+		}
+	}
+
+
+	/**
+	 * clear line and draw buffer
+	 **/
+	void draw_buffer(){
 		printf("\x1b[2K\x1b[%iD", buffer_pos);
 		for (int i=0; i<(buffer_pos); i++){
 			Serial.print(buffer[i]);
 		}
+	}
+
+	/**
+	 * Get current input
+	 **/
+	String get_buff_input(){
+		String input = String("");
+		if (buffer_pos>0){
+			char tb[buffer_pos];
+			for (int i=0; i<buffer_pos;i++){
+				tb[i] = buffer[i];
+			}
+			tb[buffer_pos]='\0';
+			input = String(tb);
+		}
+		return input;
 	}
 
 
@@ -205,12 +301,12 @@ class SerialTerm {
 	    return;
 	  }
 
-
 		// catch empty command
 		if ( command == ""){
 			return;
 		}
 
+		// try to find entered command in cb-lookup
 		for (int i=0; i<TTY_MAX_CMDS; i++){
 			if (command==lookup_table[i]){
 				callbacks[i]();
@@ -224,75 +320,6 @@ class SerialTerm {
 		return;
 	}
 
-
-	String get_buff_input(){
-		String input = String("");
-		if (buffer_pos>0){
-			char tb[buffer_pos+1];
-			for (int i=0; i<buffer_pos;i++){
-				tb[i] = buffer[i];
-			}
-			tb[buffer_pos+1]='\0';
-			input = String(tb);
-		}
-		return input;
-	}
-
-
-	//
-	// Experimential: command tab completion
-	//
-	void tab_completion() {
-
-		String input = get_buff_input();
-		// return if function arg
-		String s_chk = str_token(input, ' ', 1);
-		if (s_chk.length()>0){
-			return;
-		}
-		// count matches and get last one
-		int cmdc = 0;
-		int last_match = 0;
-		for (int i=0; i<TTY_MAX_CMDS; i++){
-			if (lookup_table[i].startsWith(input)){
-				cmdc++;
-				last_match = i;
-			}
-		}
-		// nothing matches: return
-		if (cmdc==0){
-			return;
-		}
-		// 1 match: complete command
-		if (cmdc==1){
-			String pstr = lookup_table[last_match].substring(input.length());
-			// fill buffer
-			for (int i=0; i<pstr.length();i++){
-				buffer[buffer_pos] = pstr.charAt(i);
-				buffer_pos++;
-			}
-			buffer[buffer_pos] = ' ';
-			buffer_pos++;
-			Serial.print(pstr);
-			Serial.print(" ");
-			return;
-		}
-		// more than 1 match: print commands
-		// TODO: complete to same
-		if (cmdc>1) {
-			Serial.print("\x1b\n\r");
-			//int reslen = 0;
-			for (int i=0; i<TTY_MAX_CMDS; i++){
-				if (lookup_table[i].startsWith(input)){
-					//reslen+=(lookup_table[i].length()+4);
-					Serial.print(lookup_table[i]);
-					Serial.print('\t');
-				}
-			}
-			Serial.print("\n\r");
-			Serial.print(input);
-		}
-	}
 
 
   public:
